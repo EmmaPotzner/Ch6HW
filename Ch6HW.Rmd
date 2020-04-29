@@ -1,0 +1,113 @@
+---
+title: "Ch 6 HW"
+output: html_document
+---
+#Emma Potzner 04/29/2020
+
+#9. In this exercise, we will predict the number of applications received using the other variables in the College data set.
+**(a) Split the data set into a training set and a test set.**
+```{r}
+library(ISLR)
+library(glmnet)
+#View(College)
+set.seed(1)
+train = sample(1:dim(College)[1], dim(College)[1] / 2)
+test <- -train
+College.train <- College[train, ]
+College.test <- College[test, ]
+```
+
+**(b) Fit a linear model using least squares on the training set, and report the test error obtained.***
+```{r}
+fit.lm <- lm(Apps ~ ., data = College.train)
+pred.lm <- predict(fit.lm, College.test)
+linear_MSE <- mean((pred.lm - College.test$Apps)^2); linear_MSE
+```
+*According to this test, the least square is 1108531.*
+
+**(c) Fit a ridge regression model on the training set, with λ chosen by cross-validation. Report the test error obtained.**
+```{r}
+train.mat <- model.matrix(Apps ~ ., data = College.train)
+test.mat <- model.matrix(Apps ~ ., data = College.test)
+grid <- 10 ^ seq(4, -2, length = 100)
+fit.ridge <- glmnet(train.mat, College.train$Apps, alpha = 0, lambda = grid, thresh = 1e-12)
+cv.ridge <- cv.glmnet(train.mat, College.train$Apps, alpha = 0, lambda = grid, thresh = 1e-12)
+bestlam.ridge <- cv.ridge$lambda.min
+bestlam.ridge
+```
+```{r}
+pred.ridge <- predict(fit.ridge, s = bestlam.ridge, newx = test.mat)
+ridge_MSE <-mean((pred.ridge - College.test$Apps)^2); ridge_MSE
+```
+*The test MSE is higher for ridge regression than for least squares.* 
+
+**(d) Fit a lasso model on the training set, with λ chosen by cross- validation. Report the test error obtained, along with the number of non-zero coefficient estimates.**
+*I fit a lasso with alpha = 1.*
+```{r}
+fit.lasso <- glmnet(train.mat, College.train$Apps, alpha = 1, lambda = grid, thresh = 1e-12)
+cv.lasso <- cv.glmnet(train.mat, College.train$Apps, alpha = 1, lambda = grid, thresh = 1e-12)
+bestlam.lasso <- cv.lasso$lambda.min
+bestlam.lasso
+```
+```{r}
+pred.lasso <- predict(fit.lasso, s = bestlam.lasso, newx = test.mat)
+lasso_MSE <- mean((pred.lasso - College.test$Apps)^2); lasso_MSE
+```
+*The test MSE is also higher for ridge regression than for least squares.* 
+```{r}
+predict(fit.lasso, s = bestlam.lasso, type = "coefficients")
+```
+
+
+**(e) Fit a PCR model on the training set, with M chosen by cross- validation. Report the test error obtained, along with the value of M selected by cross-validation.**
+```{r}
+library(pls)
+fit.pcr <- pcr(Apps ~ ., data = College.train, scale = TRUE, validation = "CV")
+validationplot(fit.pcr, val.type = "MSEP")
+```
+```{r}
+pred.pcr <- predict(fit.pcr, College.test, ncomp = 10)
+pcr_MSE <-mean((pred.pcr - College.test$Apps)^2); pcr_MSE
+```
+*The test Mean-Squared Error also appears to be higher for PCR than for least squares.* 
+
+**(f) Fit a PLS model on the training set, with M chosen by cross- validation. Report the test error obtained, along with the value of M selected by cross-validation.**
+```{r}
+fit.pls <- plsr(Apps ~ ., data = College.train, scale = TRUE, validation = "CV")
+validationplot(fit.pls, val.type = "MSEP")
+```
+```{r}
+pred.pls <- predict(fit.pls, College.test, ncomp = 10)
+mean((pred.pls - College.test$Apps)^2)
+pls_MSE <- mean((College.test[, "Apps"] - data.frame(pred.pls))^2); pls_MSE
+```
+*The test MSE is lower for PLS than for the least squares test.* 
+
+**(g) Comment on the results obtained. How accurately can we predict the number of college applications received? Is there much difference among the test errors resulting from these five ap- proaches?**
+
+*I chose to compute the test R^2 for all models.* 
+
+```{r}
+avg.test <- mean(College.test$Apps)
+lm.r2 <- 1 - mean((pred.lm - College.test$Apps)^2) / mean((avg.test - College.test$Apps)^2)
+ridge.r2 <- 1 - mean((pred.ridge - College.test$Apps)^2) / mean((avg.test - College.test$Apps)^2)
+lasso.r2 <- 1 - mean((pred.lasso - College.test$Apps)^2) / mean((avg.test - College.test$Apps)^2)
+pcr.r2 <- 1 - mean((pred.pcr - College.test$Apps)^2) / mean((avg.test - College.test$Apps)^2)
+pls.r2 <- 1 - mean((pred.pls - College.test$Apps)^2) / mean((avg.test - College.test$Apps)^2)
+
+barplot(c(lm.r2, ridge.r2, lasso.r2, pcr.r2, pls.r2), col="cornflowerblue", 
+        names.arg=c("OLS","Ridge", "Lasso", "PCR", "PLS"), main = "Test R-Squared",
+        ylab = "Test R-Squared", ylim = c(0,1))
+barplot(c(linear_MSE, ridge_MSE, lasso_MSE, pcr_MSE, pls_MSE), col="orangered", 
+        names.arg=c("OLS","Ridge", "Lasso", "PCR", "PLS"), main = "Test MSE",
+        ylab = "Test MSE")
+
+```
+
+*The results from the R-squared tests show that PCR has the smallest amount of variation in the data. PCR is the only test that does not predict college applications with relatively high accuracy. The test MSE is also the highest for PCR.*
+
+
+
+ 
+
+
